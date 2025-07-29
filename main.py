@@ -93,6 +93,24 @@ def get_cpu_info():
         }
 
 
+def get_audio_file(audio_file_path=None, cache_dir="cache"):
+    """Get audio file from specified path or download default if needed"""
+    # If audio file path is specified, try to use it
+    if audio_file_path:
+        if os.path.exists(audio_file_path):
+            print(f"Using specified audio file: {audio_file_path}")
+            return audio_file_path
+        else:
+            print(f"Warning: Specified audio file not found: {audio_file_path}")
+            print("Falling back to default audio file...")
+
+    # Download default audio file
+    return download_audio_file(
+        "https://storage.openvinotoolkit.org/models_contrib/speech/2021.2/librispeech_s5/how_are_you_doing_today.wav",
+        cache_dir,
+    )
+
+
 def download_audio_file(url, cache_dir="cache"):
     """Download audio file with caching"""
     os.makedirs(cache_dir, exist_ok=True)
@@ -163,9 +181,7 @@ def validate_model_files(model_path):
     return True
 
 
-def run_benchmark(
-    model_path, audio_file, num_beams=1, language="<|en|>", device="CPU", iterations=5
-):
+def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=5):
     """Run the benchmark with specified parameters"""
     # Validate model files
     if not validate_model_files(model_path):
@@ -179,7 +195,7 @@ def run_benchmark(
 
     # Initialize pipeline
     print(f"Initializing WhisperPipeline with model: {model_path}")
-    print(f"Device: {device}, Num beams: {num_beams}, Language: {language}")
+    print(f"Device: {device}, Num beams: {num_beams}")
 
     try:
         pipe = WhisperPipeline(model_path, device=device)
@@ -194,7 +210,7 @@ def run_benchmark(
     # Warm-up run
     print("Performing warm-up run...")
     try:
-        _ = pipe.generate(audio, language=language, num_beams=num_beams)
+        _ = pipe.generate(audio, num_beams=num_beams)
     except Exception as e:
         print(f"Error during warm-up: {e}")
         raise
@@ -211,7 +227,7 @@ def run_benchmark(
 
         # Time the inference
         start_time = time.time()
-        result = pipe.generate(audio, language=language, num_beams=num_beams)
+        result = pipe.generate(audio, num_beams=num_beams)
         end_time = time.time()
 
         # Get memory after
@@ -237,7 +253,6 @@ def run_benchmark(
         "model_path": model_path,
         "audio_duration": audio_duration,
         "num_beams": num_beams,
-        "language": language,
         "device": device,
         "iterations": iterations,
         "times": times,
@@ -266,9 +281,6 @@ def main():
         help="Number of beams for decoding (default: 1)",
     )
     parser.add_argument(
-        "--language", type=str, default="<|en|>", help="Language code (default: <|en|>)"
-    )
-    parser.add_argument(
         "--device", type=str, default="CPU", help="Device to use (default: CPU)"
     )
     parser.add_argument(
@@ -276,6 +288,11 @@ def main():
         type=int,
         default=5,
         help="Number of benchmark iterations (default: 5)",
+    )
+    parser.add_argument(
+        "--audio-file",
+        type=str,
+        help="Path to audio file for benchmarking (if not specified, downloads default file)",
     )
     parser.add_argument("--output-json", type=str, help="Output results to JSON file")
 
@@ -300,12 +317,11 @@ def main():
     print(f"Memory: {psutil.virtual_memory().total / 1024 / 1024 / 1024:.1f} GB")
     print()
 
-    # Download audio file
-    audio_url = "https://storage.openvinotoolkit.org/models_contrib/speech/2021.2/librispeech_s5/how_are_you_doing_today.wav"
+    # Get audio file (specified or default)
     try:
-        audio_file = download_audio_file(audio_url)
+        audio_file = get_audio_file(args.audio_file)
     except Exception as e:
-        print(f"Failed to download audio file: {e}")
+        print(f"Failed to get audio file: {e}")
         sys.exit(1)
 
     # Run benchmark
@@ -314,7 +330,6 @@ def main():
             args.model_path,
             audio_file,
             num_beams=args.num_beams,
-            language=args.language,
             device=args.device,
             iterations=args.iterations,
         )
