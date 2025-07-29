@@ -50,7 +50,7 @@ set "MODEL_PATH="
 set "ITERATIONS=5"
 set "NUM_BEAMS=1"
 set "DEVICE=CPU"
-set "LANGUAGE=^<^|en^|^>"
+set "AUDIO_FILE="
 
 REM Parse command line arguments
 :parse_args
@@ -79,8 +79,8 @@ if "%~1"=="--device" (
     shift
     goto parse_args
 )
-if "%~1"=="--language" (
-    set "LANGUAGE=%~2"
+if "%~1"=="--audio-file" (
+    set "AUDIO_FILE=%~2"
     shift
     shift
     goto parse_args
@@ -93,12 +93,13 @@ if "%~1"=="--help" (
     echo   --iterations N        Number of benchmark iterations (default: 5)
     echo   --num-beams N         Number of beams for decoding (default: 1)
     echo   --device DEVICE       Device to use: CPU, GPU (default: CPU)
-    echo   --language LANG       Language code (default: ^^^<^^^|en^^^|^^^>)
+    echo   --audio-file PATH     Path to audio file (if not specified, downloads default)
     echo   --help                Show this help message
     echo.
     echo Examples:
     echo   run_benchmark.bat --model-path models\whisper-large-v3-turbo-stateless
     echo   run_benchmark.bat --model-path models\whisper-base --iterations 10
+    echo   run_benchmark.bat --audio-file my_audio.wav --iterations 3
     echo.
     pause
     exit /b 0
@@ -138,7 +139,7 @@ echo Model Path: %MODEL_PATH%
 echo Iterations: %ITERATIONS%
 echo Num Beams: %NUM_BEAMS%
 echo Device: %DEVICE%
-echo Language: %LANGUAGE%
+if not "%AUDIO_FILE%"=="" echo Audio File: %AUDIO_FILE%
 echo ==========================================================
 echo.
 
@@ -146,7 +147,11 @@ REM Change to python directory and run benchmark
 cd python
 
 echo Running benchmark...
-python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --language %LANGUAGE%
+if "%AUDIO_FILE%"=="" (
+    python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
+) else (
+    python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --audio-file "%AUDIO_FILE%"
+)
 
 set "BENCHMARK_EXIT_CODE=%ERRORLEVEL%"
 
