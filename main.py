@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import platform
 import subprocess
@@ -181,6 +180,53 @@ def validate_model_files(model_path):
     return True
 
 
+def save_yaml_results(results, output_file):
+    """Save benchmark results to YAML file with descriptive comments"""
+    from datetime import datetime
+
+    # Create YAML content with comments
+    yaml_content = f"""# Whisper OpenVINO ベンチマーク結果
+# 生成日時: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+# このファイルは音声認識モデルの性能測定結果を記録しています
+
+# システム情報 - 実行環境の詳細
+system_info:
+  platform: "{results["system_info"]["platform"]}"  # オペレーティングシステム
+  python: "{results["system_info"]["python"]}"      # Python バージョン
+  cpu:
+    name: "{results["system_info"]["cpu"]["name"]}"       # CPU名
+    cores: {results["system_info"]["cpu"]["cores"]}       # 物理コア数
+    threads: {results["system_info"]["cpu"]["threads"]}   # 論理プロセッサ数（ハイパースレッディング含む）
+    features: {results["system_info"]["cpu"]["features"]} # CPU拡張命令セット（AVX2, AVX512など）
+  memory_gb: {results["system_info"]["memory_gb"]:.1f}    # システムメモリ容量（GB）
+
+# ベンチマーク設定 - 測定条件
+model_path: "{results["model_path"]}"          # 使用したWhisperモデルのパス
+audio_duration: {results["audio_duration"]:.2f}           # 音声ファイルの長さ（秒）
+num_beams: {results["num_beams"]}              # ビームサーチの幅（1=貪欲デコーディング）
+device: "{results["device"]}"                  # 使用デバイス（CPU/GPU）
+iterations: {results["iterations"]}            # ベンチマーク実行回数
+
+# 性能結果 - 推論時間とメモリ使用量
+performance:
+  avg_time: {results["avg_time"]:.3f}          # 平均実行時間（秒）
+  min_time: {results["min_time"]:.3f}          # 最短実行時間（秒）
+  max_time: {results["max_time"]:.3f}          # 最長実行時間（秒）
+  std_time: {results["std_time"]:.3f}          # 実行時間の標準偏差（秒）
+  rtf: {results["rtf"]:.3f}                    # RTF（リアルタイムファクター）※1.0未満なら実時間より高速
+  avg_memory_mb: {results["avg_memory_mb"]:.1f}# 平均メモリ使用量（MB）
+
+# 詳細データ - 各実行の生データ
+detailed_times: {results["times"]}            # 各イテレーションの実行時間（秒）
+
+# 認識結果 - 音声からテキストへの変換結果
+transcription: "{results["transcription"]}"   # 音声認識で得られたテキスト
+"""
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(yaml_content)
+
+
 def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=5):
     """Run the benchmark with specified parameters"""
     # Validate model files
@@ -295,10 +341,10 @@ def main():
         help="Path to audio file for benchmarking (if not specified, downloads default file)",
     )
     parser.add_argument(
-        "--output-json",
+        "--output-yaml",
         type=str,
-        default="benchmark_results.json",
-        help="Output results to JSON file (default: benchmark_results.json)",
+        default="benchmark_results.yaml",
+        help="Output results to YAML file (default: benchmark_results.yaml)",
     )
 
     args = parser.parse_args()
@@ -368,10 +414,9 @@ def main():
 
     print(f"\nTranscription: {results['transcription']}")
 
-    # Save to JSON (default enabled)
-    with open(args.output_json, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-    print(f"\nResults saved to: {args.output_json}")
+    # Save to YAML (default enabled)
+    save_yaml_results(results, args.output_yaml)
+    print(f"\nResults saved to: {args.output_yaml}")
 
 
 if __name__ == "__main__":
