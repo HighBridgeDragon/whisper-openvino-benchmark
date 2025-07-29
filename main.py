@@ -159,7 +159,7 @@ def validate_model_files(model_path):
         )
         return False
 
-    print("✓ All required model files found")
+    print("OK All required model files found")
     return True
 
 
