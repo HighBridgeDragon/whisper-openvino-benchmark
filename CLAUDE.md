@@ -75,6 +75,38 @@ ruff check .
 ruff check --fix .
 ```
 
+### ポータブル配布版（Embeddable Python）
+
+#### ポータブル環境のセットアップ
+```bash
+# portable/embeddable/ ディレクトリに移動
+cd portable/embeddable/
+
+# ポータブル環境を自動構築（Python 3.13.2 Embeddable + uv）
+setup_portable.bat
+
+# 環境テスト（オプション）
+test_setup.bat
+```
+
+#### ポータブル版ベンチマーク実行
+```bash
+# 基本実行（モデル自動検出）
+run_benchmark.bat
+
+# オプション指定実行
+run_benchmark.bat --model-path models\whisper-large-v3-turbo-stateless --iterations 10
+
+# ヘルプ表示
+run_benchmark.bat --help
+```
+
+#### 配布パッケージ作成
+```bash
+# 配布用zipファイル作成
+create_distribution.bat
+```
+
 ## アーキテクチャ概要
 
 ### 主要ファイルの構成
@@ -98,6 +130,12 @@ ruff check --fix .
   - OpenVINOとOpenVINO GenAIのDLLとプラグインを含める設定
   - librosaやscipy関連の隠れた依存関係の指定
 
+- **portable/embeddable/**: ポータブル配布版の管理スクリプト
+  - `setup_portable.bat`: Python Embeddable環境の自動セットアップ
+  - `run_benchmark.bat`: ポータブル版ベンチマーク実行（コマンドライン引数パース機能付き）
+  - `create_distribution.bat`: 配布用zipパッケージ作成
+  - `test_setup.bat`: 環境テスト用スクリプト
+
 ### 主要な依存関係
 
 - **openvino-genai**: WhisperPipelineを提供するOpenVINOの音声認識ライブラリ
@@ -112,6 +150,23 @@ ruff check --fix .
 3. デフォルトでは英語（`<|en|>`）の認識を行う
 4. CPUデバイスでの実行がデフォルト
 5. キャッシュディレクトリに音声ファイルを保存して再利用
+
+### 配布方法の比較
+
+#### 1. PyInstallerビルド版
+- **利点**: 単一実行ファイル、簡単配布
+- **欠点**: 大きなファイルサイズ（500MB+）、OpenVINO DLLの依存関係問題
+- **用途**: 開発者向け、一回限りの配布
+
+#### 2. ポータブル版（Python Embeddable）
+- **利点**: 
+  - 軽量（約150MB）
+  - 環境競合なし
+  - 管理者権限不要
+  - デバッグが容易
+  - USBメモリから実行可能
+- **欠点**: 初回セットアップが必要
+- **用途**: エンドユーザー向け、継続的な使用
 
 ## トラブルシューティング
 
@@ -158,3 +213,34 @@ uv pip sync
 1. **量子化モデルの使用**: INT8量子化により推論速度を向上
 2. **CPUコア数の調整**: OpenVINOの並列処理設定
 3. **メモリ最適化**: 大きなモデルでのメモリ使用量管理
+
+### ポータブル版の追加トラブルシューティング
+
+#### ポータブル環境のセットアップエラー
+**症状**: `setup_portable.bat` でダウンロードエラーや権限エラーが発生
+
+**解決方法**:
+```bash
+# 管理者権限で実行
+# または手動でPython Embeddableをダウンロード
+# downloads/python-3.13.2-embed-amd64.zip に配置してから再実行
+```
+
+#### モデル自動検出の失敗
+**症状**: `run_benchmark.bat` でモデルが見つからない
+
+**解決方法**:
+```bash
+# モデルディレクトリ構造を確認
+# models/openai/whisper-large-v3-turbo-stateless/config.json が必要
+# または明示的にパス指定
+run_benchmark.bat --model-path models\specific-model-path
+```
+
+## 重要な開発ルール
+
+1. **モデルエクスポート**: 必ず `--disable-stateful` フラグを使用
+2. **UV環境**: 開発時は `uv run` を使用してPython実行
+3. **Windows専用**: CPU情報取得にWMIを使用しているためWindows専用
+4. **キャッシュ活用**: 音声ファイルは自動的にキャッシュされる
+5. **エラーハンドリング**: モデルファイル検証を必ず実行
