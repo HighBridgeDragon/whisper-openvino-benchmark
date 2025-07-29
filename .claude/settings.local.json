@@ -1,0 +1,24 @@
+{
+    "permissions": {
+        "allow": [],
+        "deny": []
+    },
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write|MultiEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run ruff format ."
+                    },
+                    {
+                        "type": "command",
+                        "command": "uv run ruff check . --fix",
+                        "suppressOutput": false
+                    }
+                ]
+            }
+        ]
+    }
+}
