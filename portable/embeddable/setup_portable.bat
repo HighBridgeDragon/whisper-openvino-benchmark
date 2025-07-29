@@ -84,18 +84,23 @@ if exist "..\..\uv.lock" copy /Y "..\..\uv.lock" %PYTHON_DIR%\
 
 cd %PYTHON_DIR%
 
-REM Install dependencies using uv (without version constraints to avoid compatibility issues)
-echo Installing core dependencies...
-python.exe -m uv pip install librosa openvino-genai openvino openvino-tokenizers psutil requests tabulate
-if %ERRORLEVEL% NEQ 0 (
-    echo Warning: uv installation failed, trying with pip...
-    python.exe -m pip install librosa openvino-genai openvino openvino-tokenizers psutil requests tabulate
+REM Install dependencies from pyproject.toml using uv sync
+echo Installing dependencies from pyproject.toml...
+if exist "pyproject.toml" (
+    echo Using uv sync for accurate dependency management...
+    python.exe -m uv sync --no-dev
     if %ERRORLEVEL% NEQ 0 (
-        echo Error: Failed to install dependencies with both uv and pip
+        echo Error: Failed to install dependencies using uv sync
         cd ..
         pause
         exit /b 1
     )
+    echo Dependencies installed successfully using uv sync
+) else (
+    echo Error: pyproject.toml not found - cannot install dependencies
+    cd ..
+    pause
+    exit /b 1
 )
 
 cd ..

@@ -148,9 +148,9 @@ cd python
 
 echo Running benchmark...
 if "%AUDIO_FILE%"=="" (
-    python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
+    .venv\Scripts\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
 ) else (
-    python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --audio-file "%AUDIO_FILE%"
+    .venv\Scripts\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --audio-file "%AUDIO_FILE%"
 )
 
 set "BENCHMARK_EXIT_CODE=%ERRORLEVEL%"
