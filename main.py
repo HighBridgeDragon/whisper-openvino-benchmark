@@ -74,7 +74,7 @@ def get_cpu_info():
                 gen in cpu_name.lower() for gen in ["core i9", "xeon", "core x"]
             ):
                 features.append("AVX512")
-        except:
+        except Exception:
             pass
 
         return {
