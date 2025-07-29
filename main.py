@@ -6,6 +6,7 @@ import sys
 import time
 from statistics import mean, stdev
 
+import cpuinfo
 import librosa
 import psutil
 import requests
@@ -14,74 +15,69 @@ from tabulate import tabulate
 
 
 def get_cpu_info():
-    """Get CPU information using Windows WMI"""
+    """Get CPU information using py-cpuinfo"""
     try:
-        # Get CPU name
-        result = subprocess.run(
-            ["wmic", "cpu", "get", "name", "/value"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        cpu_name = ""
-        for line in result.stdout.strip().split("\n"):
-            if line.startswith("Name="):
-                cpu_name = line.split("=", 1)[1].strip()
-                break
+        cpu_info_data = cpuinfo.get_cpu_info()
 
-        # Get number of cores and threads
-        result = subprocess.run(
-            ["wmic", "cpu", "get", "NumberOfCores,NumberOfLogicalProcessors", "/value"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        cpu_name = cpu_info_data.get("brand_raw", "Unknown")
+        cores = psutil.cpu_count(logical=False) or 1
+        threads = psutil.cpu_count(logical=True) or 1
 
-        cores = 0
-        threads = 0
-        for line in result.stdout.strip().split("\n"):
-            if line.startswith("NumberOfCores="):
-                cores = int(line.split("=", 1)[1].strip())
-            elif line.startswith("NumberOfLogicalProcessors="):
-                threads = int(line.split("=", 1)[1].strip())
+        # Get CPU flags
+        detected_flags = set(cpu_info_data.get("flags", []))
 
-        # Detect CPU features
+        # Map flags to feature names
         features = []
-        try:
-            # Check for AVX2
-            result = subprocess.run(
-                ["wmic", "cpu", "get", "Description", "/value"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            description = result.stdout.lower()
 
-            # Basic feature detection based on CPU generation
-            if "avx2" in description or any(
-                gen in cpu_name.lower()
-                for gen in [
-                    "core i7-4",
-                    "core i5-4",
-                    "core i3-4",
-                    "xeon e3-12",
-                    "xeon e5-26",
-                ]
-            ):
-                features.append("AVX2")
-            if "avx512" in description or any(
-                gen in cpu_name.lower() for gen in ["core i9", "xeon", "core x"]
-            ):
-                features.append("AVX512")
-        except Exception:
-            pass
+        flag_mapping = {
+            # Vector instructions (OpenVINO performance critical)
+            "avx": "AVX",
+            "avx2": "AVX2",
+            "fma": "FMA",
+            # AVX512 family (high performance inference)
+            "avx512f": "AVX512F",
+            "avx512dq": "AVX512DQ",
+            "avx512cd": "AVX512CD",
+            "avx512bw": "AVX512BW",
+            "avx512vl": "AVX512VL",
+            "avx512vnni": "AVX512VNNI",
+            "avx512_bf16": "AVX512-BF16",
+            # AI-optimized instructions (neural network acceleration)
+            "vnni": "VNNI",
+            "amx_tile": "AMX-TILE",
+            "amx_int8": "AMX-INT8",
+            "amx_bf16": "AMX-BF16",
+        }
+
+        for flag, feature_name in flag_mapping.items():
+            if flag in detected_flags:
+                features.append(feature_name)
+
+        # Windows WMI fallback for CPU name if needed
+        if cpu_name == "Unknown" and platform.system() == "Windows":
+            try:
+                result = subprocess.run(
+                    ["wmic", "cpu", "get", "name", "/value"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5,
+                )
+                for line in result.stdout.strip().split("\n"):
+                    if line.startswith("Name="):
+                        cpu_name = line.split("=", 1)[1].strip()
+                        break
+            except Exception:
+                pass
 
         return {
             "name": cpu_name,
             "cores": cores,
             "threads": threads,
             "features": features,
+            "detection_methods": "py-cpuinfo",
         }
+
     except Exception as e:
         print(f"Warning: Could not get CPU info: {e}")
         return {
@@ -89,6 +85,7 @@ def get_cpu_info():
             "cores": psutil.cpu_count(logical=False) or 1,
             "threads": psutil.cpu_count(logical=True) or 1,
             "features": [],
+            "detection_methods": "Failed",
         }
 
 
@@ -184,6 +181,20 @@ def save_yaml_results(results, output_file):
     """Save benchmark results to YAML file with descriptive comments"""
     from datetime import datetime
 
+    # Format features list for YAML
+    features = results["system_info"]["cpu"]["features"]
+    if features:
+        features_yaml = "\n" + "\n".join(f"      - {feature}" for feature in features)
+    else:
+        features_yaml = " []"
+
+    # Format detailed times list for YAML
+    times = results["times"]
+    if times:
+        times_yaml = "\n" + "\n".join(f"  - {time:.3f}" for time in times)
+    else:
+        times_yaml = " []"
+
     # Create YAML content with comments
     yaml_content = f"""# Whisper OpenVINO ベンチマーク結果
 # 生成日時: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -197,7 +208,8 @@ system_info:
     name: "{results["system_info"]["cpu"]["name"]}"       # CPU名
     cores: {results["system_info"]["cpu"]["cores"]}       # 物理コア数
     threads: {results["system_info"]["cpu"]["threads"]}   # 論理プロセッサ数（ハイパースレッディング含む）
-    features: {results["system_info"]["cpu"]["features"]} # CPU拡張命令セット（AVX2, AVX512など）
+    detection_methods: "{results["system_info"]["cpu"].get("detection_methods", "Unknown")}"  # 検出手法
+    features:{features_yaml}  # CPU拡張命令セット（OpenVINO性能に影響するもの）
   memory_gb: {results["system_info"]["memory_gb"]:.1f}    # システムメモリ容量（GB）
 
 # ベンチマーク設定 - 測定条件
@@ -214,10 +226,10 @@ performance:
   max_time: {results["max_time"]:.3f}          # 最長実行時間（秒）
   std_time: {results["std_time"]:.3f}          # 実行時間の標準偏差（秒）
   rtf: {results["rtf"]:.3f}                    # RTF（リアルタイムファクター）※1.0未満なら実時間より高速
-  avg_memory_mb: {results["avg_memory_mb"]:.1f}# 平均メモリ使用量（MB）
+  avg_memory_mb: {results["avg_memory_mb"]:.1f} # 平均メモリ使用量（MB）
 
 # 詳細データ - 各実行の生データ
-detailed_times: {results["times"]}            # 各イテレーションの実行時間（秒）
+detailed_times:{times_yaml}  # 各イテレーションの実行時間（秒）
 
 # 認識結果 - 音声からテキストへの変換結果
 transcription: "{results["transcription"]}"   # 音声認識で得られたテキスト
