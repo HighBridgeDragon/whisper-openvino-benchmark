@@ -294,7 +294,12 @@ def main():
         type=str,
         help="Path to audio file for benchmarking (if not specified, downloads default file)",
     )
-    parser.add_argument("--output-json", type=str, help="Output results to JSON file")
+    parser.add_argument(
+        "--output-json",
+        type=str,
+        default="benchmark_results.json",
+        help="Output results to JSON file (default: benchmark_results.json)",
+    )
 
     args = parser.parse_args()
 
@@ -342,6 +347,7 @@ def main():
         "platform": f"{platform.system()} {platform.release()}",
         "python": sys.version.split()[0],
         "cpu": cpu_info,
+        "memory_gb": psutil.virtual_memory().total / 1024 / 1024 / 1024,
     }
 
     # Print results table
@@ -362,11 +368,10 @@ def main():
 
     print(f"\nTranscription: {results['transcription']}")
 
-    # Save to JSON if requested
-    if args.output_json:
-        with open(args.output_json, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        print(f"\nResults saved to: {args.output_json}")
+    # Save to JSON (default enabled)
+    with open(args.output_json, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    print(f"\nResults saved to: {args.output_json}")
 
 
 if __name__ == "__main__":
