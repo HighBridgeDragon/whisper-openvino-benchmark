@@ -1,0 +1,23 @@
+[project]
+name = "whisper-openvino-benchmark"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "librosa>=0.11.0",
+    "openvino-genai>=2025.2.0.0",
+    "openvino>=2025.2.0",
+    "openvino-tokenizers>=2025.2.0",
+    "psutil>=7.0.0",
+    "requests>=2.32.4",
+    "tabulate>=0.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.14.2",
+    "ruff>=0.12.5",
+    "optimum-intel>=1.24.0",
+    "transformers>=4.40.0",
+]
