@@ -226,7 +226,8 @@ performance:
   max_time: {results["max_time"]:.3f}          # 最長実行時間（秒）
   std_time: {results["std_time"]:.3f}          # 実行時間の標準偏差（秒）
   rtf: {results["rtf"]:.3f}                    # RTF（リアルタイムファクター）※1.0未満なら実時間より高速
-  avg_memory_mb: {results["avg_memory_mb"]:.1f} # 平均メモリ使用量（MB）
+  model_memory_gb: {results["model_memory_gb"]:.2f}     # モデルロード時のメモリ使用量（GB）
+  inference_memory_mb: {results["inference_memory_mb"]:.1f} # 推論時の平均メモリ使用量（MB）
 
 # 詳細データ - 各実行の生データ
 detailed_times:{times_yaml}  # 各イテレーションの実行時間（秒）
@@ -251,9 +252,13 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
     audio_duration = len(audio) / sr
     print(f"Audio duration: {audio_duration:.2f} seconds")
 
-    # Initialize pipeline
+    # Initialize pipeline with memory measurement
     print(f"Initializing WhisperPipeline with model: {model_path}")
     print(f"Device: {device}, Num beams: {num_beams}")
+
+    # Measure memory before model loading
+    process = psutil.Process()
+    mem_before_model = process.memory_info().rss / 1024 / 1024  # MB
 
     try:
         pipe = WhisperPipeline(model_path, device=device)
@@ -264,6 +269,11 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
         print("2. Check that all required model files exist")
         print("3. Verify OpenVINO GenAI version compatibility")
         raise
+
+    # Measure memory after model loading
+    mem_after_model = process.memory_info().rss / 1024 / 1024  # MB
+    model_memory_usage = (mem_after_model - mem_before_model) / 1024  # GB
+    print(f"Model loaded. Memory usage: {model_memory_usage:.2f} GB")
 
     # Warm-up run
     print("Performing warm-up run...")
@@ -276,24 +286,23 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
     # Benchmark runs
     print(f"\nPerforming {iterations} benchmark iterations...")
     times = []
-    memory_usage = []
+    inference_memory_usage = []
 
     for i in range(iterations):
-        # Get memory before
-        process = psutil.Process()
-        mem_before = process.memory_info().rss / 1024 / 1024  # MB
+        # Get memory before inference
+        mem_before_inference = process.memory_info().rss / 1024 / 1024  # MB
 
         # Time the inference
         start_time = time.time()
         result = pipe.generate(audio, num_beams=num_beams)
         end_time = time.time()
 
-        # Get memory after
-        mem_after = process.memory_info().rss / 1024 / 1024  # MB
+        # Get memory after inference
+        mem_after_inference = process.memory_info().rss / 1024 / 1024  # MB
 
         inference_time = end_time - start_time
         times.append(inference_time)
-        memory_usage.append(mem_after - mem_before)
+        inference_memory_usage.append(mem_after_inference - mem_before_inference)
 
         print(
             f"Iteration {i + 1}/{iterations}: {inference_time:.3f}s (RTF: {inference_time / audio_duration:.3f})"
@@ -304,7 +313,7 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
     min_time = min(times)
     max_time = max(times)
     std_time = stdev(times) if len(times) > 1 else 0
-    avg_memory = mean(memory_usage)
+    avg_inference_memory = mean(inference_memory_usage)
     rtf = avg_time / audio_duration
 
     return {
@@ -319,7 +328,8 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
         "max_time": max_time,
         "std_time": std_time,
         "rtf": rtf,
-        "avg_memory_mb": avg_memory,
+        "model_memory_gb": model_memory_usage,
+        "inference_memory_mb": avg_inference_memory,
         "transcription": result,
     }
 
@@ -420,7 +430,8 @@ def main():
         ["Max Time", f"{results['max_time']:.3f} seconds"],
         ["Std Dev", f"{results['std_time']:.3f} seconds"],
         ["Real-time Factor", f"{results['rtf']:.3f}"],
-        ["Avg Memory Usage", f"{results['avg_memory_mb']:.1f} MB"],
+        ["Model Memory Usage", f"{results['model_memory_gb']:.2f} GB"],
+        ["Inference Memory Usage", f"{results['inference_memory_mb']:.1f} MB"],
     ]
     print(tabulate(table_data, headers="firstrow", tablefmt="grid"))
 
