@@ -10,8 +10,8 @@ echo ==========================================================
 echo.
 
 REM Check if portable environment exists
-if not exist "python\python.exe" (
-    echo Error: Portable environment not found.
+if not exist ".venv\Scripts\python.exe" (
+    echo Error: Virtual environment not found.
     echo Please run setup_portable.bat first.
     pause
     exit /b 1
@@ -143,9 +143,7 @@ if not "%AUDIO_FILE%"=="" echo Audio File: %AUDIO_FILE%
 echo ==========================================================
 echo.
 
-REM Change to python directory and run benchmark
-cd python
-
+REM Run benchmark from current directory
 echo Running benchmark...
 if "%AUDIO_FILE%"=="" (
     .venv\Scripts\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
@@ -154,8 +152,6 @@ if "%AUDIO_FILE%"=="" (
 )
 
 set "BENCHMARK_EXIT_CODE=%ERRORLEVEL%"
-
-cd ..
 
 echo.
 if %BENCHMARK_EXIT_CODE% EQU 0 (

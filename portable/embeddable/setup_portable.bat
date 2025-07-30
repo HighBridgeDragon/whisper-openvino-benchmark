@@ -14,11 +14,13 @@ set "UV_VERSION=0.5.14"
 set "PROJECT_NAME=whisper-benchmark"
 
 REM Check if already set up
-if exist "%PYTHON_DIR%\python.exe" (
-    echo Portable environment already exists.
-    echo Run run_benchmark.bat to execute the benchmark.
-    pause
-    exit /b 0
+if exist "python\python.exe" (
+    if exist ".venv\Scripts\python.exe" (
+        echo Virtual environment already exists.
+        echo Run run_benchmark.bat to execute the benchmark.
+        pause
+        exit /b 0
+    )
 )
 
 echo [1/5] Downloading Python Embeddable...
@@ -77,38 +79,34 @@ if %ERRORLEVEL% NEQ 0 (
 cd ..
 
 echo [5/5] Installing project dependencies...
-REM Copy project files to portable environment  
-copy /Y "..\..\main.py" "%PYTHON_DIR%\main.py"
-if exist "..\..\pyproject.toml" copy /Y "..\..\pyproject.toml" %PYTHON_DIR%\
-if exist "..\..\uv.lock" copy /Y "..\..\uv.lock" %PYTHON_DIR%\
-
-cd %PYTHON_DIR%
+REM Copy project files for uv sync
+copy /Y "..\..\main.py" "main.py"
+if exist "..\..\pyproject.toml" copy /Y "..\..\pyproject.toml" "pyproject.toml"
+if exist "..\..\uv.lock" copy /Y "..\..\uv.lock" "uv.lock"
 
 REM Install dependencies from pyproject.toml using uv sync
-echo Installing dependencies from pyproject.toml...
+echo Installing dependencies from pyproject.toml
 if exist "pyproject.toml" (
-    echo Using uv sync for accurate dependency management...
-    python.exe -m uv sync --no-dev
+    echo Using uv sync to create virtual environment .venv
+    python\python.exe -m uv sync --no-dev
     if %ERRORLEVEL% NEQ 0 (
         echo Error: Failed to install dependencies using uv sync
-        cd ..
         pause
         exit /b 1
     )
-    echo Dependencies installed successfully using uv sync
+    echo Dependencies installed successfully in .venv
 ) else (
     echo Error: pyproject.toml not found - cannot install dependencies
-    cd ..
     pause
     exit /b 1
 )
-
-cd ..
 
 echo.
 echo ==========================================================
 echo Setup completed successfully!
 echo ==========================================================
+echo.
+echo Virtual environment created at: .venv
 echo.
 echo To run the benchmark:
 echo   1. Place your Whisper model in 'models' directory
@@ -116,6 +114,6 @@ echo   2. Run: run_benchmark.bat
 echo.
 echo The portable environment is ready for distribution.
 echo Total size: 
-dir %PYTHON_DIR% /s /-c | find "bytes"
+dir .venv /s /-c | find "bytes"
 echo.
 pause
