@@ -61,9 +61,6 @@ uv run pyinstaller benchmark_minimal.spec --clean
 ```bash
 # 直接実行
 python main.py --model-path "path/to/whisper/model" --iterations 5
-
-# テストスクリプト実行
-python test.py
 ```
 
 ### リンター実行
