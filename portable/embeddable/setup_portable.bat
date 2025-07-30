@@ -8,10 +8,34 @@ echo ==========================================================
 echo.
 
 REM Set variables
-set "PYTHON_VERSION=3.13.2"
 set "PYTHON_DIR=python"
-set "UV_VERSION=0.5.14"
 set "PROJECT_NAME=whisper-benchmark"
+
+REM Read Python version from .python-version file
+if exist "..\..\.python-version" (
+    for /f "usebackq delims=" %%i in ("..\..\.python-version") do (
+        set "PYTHON_BASE_VERSION=%%i"
+        goto found_version
+    )
+) else (
+    echo Warning: .python-version file not found, using default 3.13
+    set "PYTHON_BASE_VERSION=3.13"
+)
+
+:found_version
+REM Set Python version based on base version from .python-version
+if "%PYTHON_BASE_VERSION%"=="3.13" (
+    set "PYTHON_VERSION=3.13.2"
+) else if "%PYTHON_BASE_VERSION%"=="3.12" (
+    set "PYTHON_VERSION=3.12.8"
+) else if "%PYTHON_BASE_VERSION%"=="3.11" (
+    set "PYTHON_VERSION=3.11.11"
+) else (
+    echo Warning: Unsupported Python version %PYTHON_BASE_VERSION%, using 3.13.2
+    set "PYTHON_VERSION=3.13.2"
+)
+
+echo Using Python version: %PYTHON_VERSION%
 
 REM Check if already set up
 if exist "python\python.exe" (
@@ -48,8 +72,11 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [3/5] Configuring Python paths...
-REM Enable site-packages by uncommenting import site in python313._pth
-powershell -Command "(Get-Content '%PYTHON_DIR%\python313._pth') -replace '#import site', 'import site' | Set-Content '%PYTHON_DIR%\python313._pth'"
+REM Enable site-packages by uncommenting import site in python._pth file
+for %%f in ("%PYTHON_DIR%\python*._pth") do (
+    echo Configuring %%f...
+    powershell -Command "(Get-Content '%%f') -replace '#import site', 'import site' | Set-Content '%%f'"
+)
 
 REM Create get-pip.py if not exists
 if not exist "%PYTHON_DIR%\get-pip.py" (
@@ -67,8 +94,9 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-REM Install uv
-python.exe -m pip install uv==%UV_VERSION%
+REM Install uv (latest version)
+echo Installing latest uv version...
+python.exe -m pip install uv --upgrade
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to install uv
     cd ..
