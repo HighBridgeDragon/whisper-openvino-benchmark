@@ -114,10 +114,6 @@ create_distribution.bat
   - `run_benchmark()`: WhisperPipelineを使用してベンチマークを実行
   - コマンドライン引数の処理と結果の表示
 
-- **test.py**: 簡単なテストスクリプト
-  - WhisperPipelineの基本的な動作確認用
-  - num_beams=2以上でエラーが発生する問題のテスト用
-
 - **build.bat**: PyInstallerを使用した実行可能ファイルビルド用スクリプト
   - UV（パッケージマネージャー）の存在確認
   - 依存関係のインストール
