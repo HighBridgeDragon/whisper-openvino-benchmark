@@ -40,6 +40,10 @@ echo [3/4] Copying distribution files...
 copy /Y run_benchmark.bat "%DIST_DIR%\%DIST_NAME%\"
 copy /Y setup_portable.bat "%DIST_DIR%\%DIST_NAME%\"
 
+REM Copy project files from parent directory
+copy /Y "..\..\pyproject.toml" "%DIST_DIR%\%DIST_NAME%\"
+copy /Y "..\..\main.py" "%DIST_DIR%\%DIST_NAME%\"
+
 REM Create README for distribution
 echo Creating README.txt...
 (

@@ -15,8 +15,8 @@ set "PROJECT_NAME=whisper-benchmark"
 
 REM Check if already set up
 if exist "python\python.exe" (
-    if exist ".venv\Scripts\python.exe" (
-        echo Virtual environment already exists.
+    if exist "python\Lib\site-packages\openvino_genai" (
+        echo Dependencies already installed.
         echo Run run_benchmark.bat to execute the benchmark.
         pause
         exit /b 0
@@ -79,41 +79,31 @@ if %ERRORLEVEL% NEQ 0 (
 cd ..
 
 echo [5/5] Installing project dependencies...
-REM Copy project files for uv sync
+REM Copy project files
 copy /Y "..\..\main.py" "main.py"
 if exist "..\..\pyproject.toml" copy /Y "..\..\pyproject.toml" "pyproject.toml"
-if exist "..\..\uv.lock" copy /Y "..\..\uv.lock" "uv.lock"
 
-REM Install dependencies from pyproject.toml using uv sync
-echo Installing dependencies from pyproject.toml
-if exist "pyproject.toml" (
-    echo Using uv sync to create virtual environment .venv
-    python\python.exe -m uv sync --no-dev
-    if %ERRORLEVEL% NEQ 0 (
-        echo Error: Failed to install dependencies using uv sync
-        pause
-        exit /b 1
-    )
-    echo Dependencies installed successfully in .venv
-) else (
-    echo Error: pyproject.toml not found - cannot install dependencies
+REM Install dependencies directly into Python embeddable using pip
+echo Installing dependencies directly into Python environment...
+python\python.exe -m pip install openvino-genai psutil librosa tabulate py-cpuinfo
+if %ERRORLEVEL% NEQ 0 (
+    echo Error: Failed to install dependencies using pip
     pause
     exit /b 1
 )
+echo Dependencies installed successfully
 
 echo.
 echo ==========================================================
 echo Setup completed successfully!
 echo ==========================================================
 echo.
-echo Virtual environment created at: .venv
+echo Python environment ready at: python\
 echo.
 echo To run the benchmark:
 echo   1. Place your Whisper model in 'models' directory
 echo   2. Run: run_benchmark.bat
 echo.
 echo The portable environment is ready for distribution.
-echo Total size: 
-dir .venv /s /-c | find "bytes"
 echo.
 pause

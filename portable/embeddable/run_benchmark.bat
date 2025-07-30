@@ -10,8 +10,16 @@ echo ==========================================================
 echo.
 
 REM Check if portable environment exists
-if not exist ".venv\Scripts\python.exe" (
-    echo Error: Virtual environment not found.
+if not exist "python\python.exe" (
+    echo Error: Portable Python environment not found.
+    echo Please run setup_portable.bat first.
+    pause
+    exit /b 1
+)
+
+REM Check if dependencies are installed
+if not exist "python\Lib\site-packages\openvino_genai" (
+    echo Error: Dependencies not installed.
     echo Please run setup_portable.bat first.
     pause
     exit /b 1
@@ -146,9 +154,9 @@ echo.
 REM Run benchmark from current directory
 echo Running benchmark...
 if "%AUDIO_FILE%"=="" (
-    .venv\Scripts\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
+    python\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE%
 ) else (
-    .venv\Scripts\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --audio-file "%AUDIO_FILE%"
+    python\python.exe main.py --model-path "%MODEL_PATH%" --iterations %ITERATIONS% --num-beams %NUM_BEAMS% --device %DEVICE% --audio-file "%AUDIO_FILE%"
 )
 
 set "BENCHMARK_EXIT_CODE=%ERRORLEVEL%"
