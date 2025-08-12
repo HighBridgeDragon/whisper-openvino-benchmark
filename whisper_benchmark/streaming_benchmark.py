@@ -54,7 +54,7 @@ class StreamingBenchmarkResults:
 def split_audio_into_chunks(
     audio: np.ndarray,
     sample_rate: int,
-    chunk_size_sec: float = 30.0,
+    chunk_size_sec: float = 25.0,
     overlap_sec: float = 0.0,
 ) -> List[Tuple[np.ndarray, float, float]]:
     """
@@ -94,7 +94,7 @@ def split_audio_into_chunks(
 def run_streaming_benchmark(
     model_path: str,
     audio_file: str,
-    chunk_size_sec: float = 30.0,
+    chunk_size_sec: float = 25.0,
     overlap_sec: float = 0.0,
     num_beams: int = 1,
     device: str = "CPU",
@@ -183,7 +183,40 @@ def run_streaming_benchmark(
 
         # チャンク処理
         chunk_start_time = time.time()
-        transcription = pipe.generate(chunk_audio, num_beams=num_beams)
+
+        # 真のストリーミング処理（30秒未満のチャンクのみ）
+        if chunk_duration <= 30.0:
+            if verbose:
+                print(f"\n--- Chunk {i + 1}/{num_chunks} (Streaming) ---")
+                print(f"Time: {start_time:.1f}s - {end_time:.1f}s")
+                print("Transcription: ", end="", flush=True)
+
+            # ストリーミング用コールバック関数
+            transcribed_text = ""
+
+            def streamer_callback(text_chunk):
+                nonlocal transcribed_text
+                if verbose:
+                    print(text_chunk, end="", flush=True)
+                transcribed_text += text_chunk
+                return False  # 続行
+
+            # ストリーミング実行（return_timestamps=Falseが必須）
+            result = pipe.generate(
+                chunk_audio.tolist(),
+                num_beams=num_beams,
+                streamer=streamer_callback,
+                return_timestamps=False,
+            )
+            transcription = str(result) if result else transcribed_text
+        else:
+            # 30秒超の場合は従来方式
+            transcription = pipe.generate(chunk_audio, num_beams=num_beams)
+            if verbose:
+                print(f"\n--- Chunk {i + 1}/{num_chunks} (Non-streaming, >30s) ---")
+                print(f"Time: {start_time:.1f}s - {end_time:.1f}s")
+                print(f"Transcription: {transcription}")
+
         chunk_end_time = time.time()
 
         # 推論後のメモリ測定
@@ -212,11 +245,7 @@ def run_streaming_benchmark(
         chunk_metrics.append(metrics)
         transcriptions.append(str(transcription))
 
-        if verbose:
-            print(
-                f"Chunk {i + 1}/{num_chunks}: {processing_time:.3f}s "
-                f"(RTF: {rtf:.3f}, Cumulative RTF: {cumulative_rtf:.3f})"
-            )
+        # ストリーミング処理では既にリアルタイム表示済み
 
     # 統計計算
     processing_times = [m.processing_time for m in chunk_metrics]
