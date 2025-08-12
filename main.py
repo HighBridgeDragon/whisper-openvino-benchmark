@@ -438,8 +438,15 @@ def main():
     print(f"\nTranscription: {results['transcription']}")
 
     # Save to YAML (default enabled)
-    save_yaml_results(results, args.output_yaml)
-    print(f"\nResults saved to: {args.output_yaml}")
+    # 環境変数OUTPUT_DIRが設定されている場合は、そのディレクトリに保存
+    output_path = args.output_yaml
+    output_dir = os.environ.get("OUTPUT_DIR")
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, os.path.basename(args.output_yaml))
+
+    save_yaml_results(results, output_path)
+    print(f"\nResults saved to: {output_path}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  whisper-benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: whisper-benchmark:latest
+    container_name: whisper-benchmark
+    volumes:
+      # モデルファイル（読み取り専用）
+      - ./models:/app/models:ro
+      # キャッシュディレクトリ
+      - ./cache:/app/cache
+      # 結果出力ディレクトリ
+      - ./output:/app/output
+      # カスタム音声ファイル（読み取り専用）
+      - ./audio:/app/audio:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OUTPUT_DIR=/app/output
+      # OpenVINOのスレッド数設定（必要に応じて調整）
+      - OMP_NUM_THREADS=8
+      - TBB_NUM_THREADS=8
+    # コンテナ実行時の設定
+    stdin_open: true
+    tty: true
+    # セキュリティ設定
+    security_opt:
+      - no-new-privileges:true
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
