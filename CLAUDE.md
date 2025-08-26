@@ -58,9 +58,24 @@ uv run pyinstaller benchmark_minimal.spec --clean
 ```
 
 ### コードの実行
+
+#### 標準ベンチマーク
 ```bash
 # 直接実行
 python main.py --model-path "path/to/whisper/model" --iterations 5
+```
+
+#### ストリーミングベンチマーク（真のストリーミング実装）
+```bash
+# ストリーミングモードでベンチマーク実行
+python main.py --model-path "path/to/whisper/model" --streaming-mode
+
+# 詳細オプション付き
+python main.py --model-path "path/to/whisper/model" --streaming-mode \
+  --chunk-size 1.0 \      # チャンクサイズ（秒）
+  --overlap 0.2 \         # オーバーラップ（秒）
+  --buffer-size 5 \       # バッファサイズ（チャンク数）
+  --disable-realtime      # リアルタイムペーシング無効化
 ```
 
 ### リンター実行
@@ -109,10 +124,27 @@ create_distribution.bat
 ### 主要ファイルの構成
 
 - **main.py**: ベンチマークツールのメインエントリーポイント
-  - `get_cpu_info()`: Windows WMIを使用してCPU情報を取得
-  - `download_audio_file()`: テスト用音声ファイルをキャッシュ付きでダウンロード
-  - `run_benchmark()`: WhisperPipelineを使用してベンチマークを実行
-  - コマンドライン引数の処理と結果の表示
+  - コマンドライン引数の処理
+  - 標準ベンチマークとストリーミングベンチマークの切り替え
+  - 結果の表示とYAML保存
+
+- **whisper_benchmark/true_streaming.py**: 真のストリーミング処理実装
+  - `StreamingProcessor`: マルチスレッドによるストリーミング処理
+  - プロデューサー/コンシューマーパターン
+  - リアルタイムペーシングとバッファ管理
+  - WhisperPipelineのstreamer機能活用
+
+- **whisper_benchmark/audio_stream.py**: 音声ストリーミング基盤
+  - `AudioStream`: リアルタイム音声ストリームシミュレーター
+  - `AudioBufferStream`: バッファリング機能付きストリーム
+  - 遅延読み込みとメモリ効率的な処理
+  - チャンク単位での音声データ供給
+
+- **whisper_benchmark/streaming_metrics.py**: ストリーミング専用メトリクス
+  - `StreamingMetrics`: 包括的なパフォーマンス指標
+  - `ChunkMetrics`: チャンク単位の詳細メトリクス
+  - リアルタイムドリフト計算
+  - バッファヘルスモニタリング
 
 - **build.bat**: PyInstallerを使用した実行可能ファイルビルド用スクリプト
   - UV（パッケージマネージャー）の存在確認
