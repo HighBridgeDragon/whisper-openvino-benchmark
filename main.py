@@ -27,7 +27,7 @@ from whisper_benchmark.system_info import get_system_info, print_system_info
 # 主要言語のコード（使用頻度が高い言語のみ）
 SUPPORTED_LANGUAGES = [
     "ar",  # アラビア語
-    "de",  # ドイツ語  
+    "de",  # ドイツ語
     "en",  # 英語
     "es",  # スペイン語
     "fr",  # フランス語
@@ -43,7 +43,7 @@ SUPPORTED_LANGUAGES = [
     "tr",  # トルコ語
     "vi",  # ベトナム語
     "zh",  # 中国語（標準中国語）
-    "yue", # 広東語
+    "yue",  # 広東語
 ]
 
 
@@ -151,7 +151,8 @@ def main():
     language_token = None
     if args.language:
         language_token = f"<|{args.language}|>"
-        if args.streaming_mode and not args.quiet:
+        # ストリーミングモードではquietでない場合のみ、標準モードでは常に表示
+        if (args.streaming_mode and not args.quiet) or not args.streaming_mode:
             print(f"Language specified: {args.language} -> {language_token}")
 
     # システム情報取得（両モード共通）
@@ -213,6 +214,7 @@ def main():
                 num_beams=args.num_beams,
                 device=args.device,
                 iterations=args.iterations,
+                language=language_token,
             )
         except Exception as e:
             print(f"Benchmark failed: {e}")

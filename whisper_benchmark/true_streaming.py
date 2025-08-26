@@ -8,7 +8,6 @@
 import time
 import threading
 import queue
-from typing import Any
 from dataclasses import dataclass
 import psutil
 import numpy as np

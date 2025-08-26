@@ -12,7 +12,9 @@ import psutil
 from openvino_genai import WhisperPipeline
 
 
-def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=5):
+def run_benchmark(
+    model_path, audio_file, num_beams=1, device="CPU", iterations=5, language=None
+):
     """
     指定されたパラメータでベンチマークを実行
 
@@ -22,6 +24,7 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
         num_beams: ビーム数（デフォルト: 1）
         device: 使用デバイス（デフォルト: "CPU"）
         iterations: イテレーション数（デフォルト: 5）
+        language: 言語トークン（例: "<|ja|>", "<|en|>"）。Noneの場合は自動検出
 
     Returns:
         ベンチマーク結果の辞書
@@ -57,8 +60,13 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
 
     # ウォームアップ実行
     print("Performing warm-up run...")
+    if language:
+        print(f"Language specified: {language}")
     try:
-        _ = pipe.generate(audio, num_beams=num_beams)
+        generate_kwargs = {"num_beams": num_beams}
+        if language:
+            generate_kwargs["language"] = language
+        _ = pipe.generate(audio, **generate_kwargs)
     except Exception as e:
         print(f"Error during warm-up: {e}")
         raise
@@ -74,7 +82,10 @@ def run_benchmark(model_path, audio_file, num_beams=1, device="CPU", iterations=
 
         # 推論時間を測定
         start_time = time.time()
-        result = pipe.generate(audio, num_beams=num_beams)
+        generate_kwargs = {"num_beams": num_beams}
+        if language:
+            generate_kwargs["language"] = language
+        result = pipe.generate(audio, **generate_kwargs)
         end_time = time.time()
 
         # 推論後のメモリ取得
