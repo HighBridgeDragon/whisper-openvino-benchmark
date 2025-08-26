@@ -24,6 +24,28 @@ from whisper_benchmark import (
 )
 from whisper_benchmark.system_info import get_system_info, print_system_info
 
+# 主要言語のコード（使用頻度が高い言語のみ）
+SUPPORTED_LANGUAGES = [
+    "ar",  # アラビア語
+    "de",  # ドイツ語  
+    "en",  # 英語
+    "es",  # スペイン語
+    "fr",  # フランス語
+    "hi",  # ヒンディー語
+    "it",  # イタリア語
+    "ja",  # 日本語
+    "ko",  # 韓国語
+    "nl",  # オランダ語
+    "pl",  # ポーランド語
+    "pt",  # ポルトガル語
+    "ru",  # ロシア語
+    "th",  # タイ語
+    "tr",  # トルコ語
+    "vi",  # ベトナム語
+    "zh",  # 中国語（標準中国語）
+    "yue", # 広東語
+]
+
 
 def main():
     """メイン関数 - コマンドライン引数を処理してベンチマークを実行"""
@@ -72,8 +94,8 @@ def main():
     parser.add_argument(
         "--chunk-size",
         type=float,
-        default=30.0,
-        help="Chunk size in seconds for streaming mode (default: 30.0)",
+        default=1.0,
+        help="Chunk size in seconds for streaming mode (default: 1.0)",
     )
     parser.add_argument(
         "--overlap",
@@ -82,14 +104,26 @@ def main():
         help="Overlap between chunks in seconds for streaming mode (default: 0.0)",
     )
     parser.add_argument(
-        "--simulate-realtime",
-        action="store_true",
-        help="Simulate real-time processing by waiting between chunks (streaming mode only)",
-    )
-    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress verbose output during processing (streaming mode only)",
+    )
+    parser.add_argument(
+        "--buffer-size",
+        type=int,
+        default=5,
+        help="Stream buffer size in chunks (default: 5)",
+    )
+    parser.add_argument(
+        "--disable-realtime",
+        action="store_true",
+        help="Disable real-time pacing for streaming mode",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        choices=SUPPORTED_LANGUAGES,
+        help=f"Language code for Whisper. Supported: {', '.join(SUPPORTED_LANGUAGES)}. If not specified, auto-detect.",
     )
 
     args = parser.parse_args()
@@ -113,6 +147,13 @@ def main():
     if not validate_model_files(args.model_path):
         print("Warning: Model validation failed, but attempting to continue...")
 
+    # 言語コードを内部形式に変換
+    language_token = None
+    if args.language:
+        language_token = f"<|{args.language}|>"
+        if args.streaming_mode and not args.quiet:
+            print(f"Language specified: {args.language} -> {language_token}")
+
     # システム情報取得（両モード共通）
     system_info = get_system_info()
 
@@ -125,10 +166,12 @@ def main():
                 audio_file=audio_file,
                 chunk_size_sec=args.chunk_size,
                 overlap_sec=args.overlap,
+                buffer_size=args.buffer_size,
                 num_beams=args.num_beams,
                 device=args.device,
-                simulate_realtime=args.simulate_realtime,
+                simulate_realtime=not args.disable_realtime,
                 verbose=not args.quiet,
+                language=language_token,
             )
         except Exception as e:
             print(f"Streaming benchmark failed: {e}")
