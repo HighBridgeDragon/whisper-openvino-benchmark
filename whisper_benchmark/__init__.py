@@ -8,7 +8,9 @@ __version__ = "1.0.0"
 __author__ = "Claude Assistant"
 
 from .system_info import get_cpu_info
-from .streaming_benchmark import run_streaming_benchmark, StreamingBenchmarkResults
+from .true_streaming import run_streaming_benchmark, StreamingConfig, StreamingProcessor
+from .streaming_metrics import StreamingMetrics, ChunkMetrics
+from .audio_stream import AudioStream, AudioBufferStream
 from .standard_benchmark import run_benchmark
 from .results_output import (
     save_yaml_results,
@@ -22,7 +24,12 @@ __all__ = [
     "get_cpu_info",
     "run_streaming_benchmark",
     "run_benchmark",
-    "StreamingBenchmarkResults",
+    "StreamingMetrics",
+    "ChunkMetrics",
+    "StreamingConfig",
+    "StreamingProcessor",
+    "AudioStream",
+    "AudioBufferStream",
     "save_yaml_results",
     "save_streaming_yaml_results",
     "print_streaming_results",
