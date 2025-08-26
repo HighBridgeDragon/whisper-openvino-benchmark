@@ -6,7 +6,7 @@
 
 from datetime import datetime
 from tabulate import tabulate
-from .streaming_benchmark import StreamingBenchmarkResults
+from .streaming_metrics import StreamingMetrics
 
 
 def save_yaml_results(results, output_file):
@@ -76,8 +76,11 @@ transcription: "{results["transcription"]}"   # 音声認識で得られたテ�
         f.write(yaml_content)
 
 
-def print_streaming_results(results: StreamingBenchmarkResults):
+def print_streaming_results(results: StreamingMetrics):
     """ストリーミングベンチマーク結果をフォーマット済みテーブルで表示"""
+
+    # メトリクスを計算
+    results.calculate_aggregate_metrics()
 
     print("\n=== Streaming Benchmark Results ===")
 
@@ -88,7 +91,8 @@ def print_streaming_results(results: StreamingBenchmarkResults):
         ["Total Processing Time", f"{results.total_processing_time:.3f} seconds"],
         ["Overall RTF", f"{results.overall_rtf:.3f}"],
         ["Throughput", f"{results.throughput_audio_per_sec:.2f} audio sec/sec"],
-        ["Number of Chunks", len(results.chunk_metrics)],
+        ["Number of Chunks", results.total_chunks],
+        ["Real-time Capable", "Yes" if results.is_realtime_capable() else "No"],
     ]
     print("\n" + tabulate(overall_data, headers="firstrow", tablefmt="grid"))
 
@@ -96,50 +100,88 @@ def print_streaming_results(results: StreamingBenchmarkResults):
     latency_data = [
         ["Latency Metric", "Value"],
         ["First Chunk Latency", f"{results.first_chunk_latency:.3f} seconds"],
-        ["Avg Chunk Processing", f"{results.avg_chunk_processing_time:.3f} seconds"],
-        ["Min Chunk Processing", f"{results.min_chunk_processing_time:.3f} seconds"],
-        ["Max Chunk Processing", f"{results.max_chunk_processing_time:.3f} seconds"],
-        ["Std Dev Processing", f"{results.std_chunk_processing_time:.3f} seconds"],
+        ["First Token Latency", f"{results.first_token_latency:.3f} seconds"],
+        ["Avg Latency", f"{results.avg_latency:.3f} seconds"],
+        ["Min Latency", f"{results.min_latency:.3f} seconds"],
+        ["Max Latency", f"{results.max_latency:.3f} seconds"],
     ]
-
-    if results.inter_chunk_latencies:
-        latency_data.append(
-            [
-                "Avg Inter-chunk Latency",
-                f"{results.avg_inter_chunk_latency:.3f} seconds",
-            ]
-        )
-
     print("\n" + tabulate(latency_data, headers="firstrow", tablefmt="grid"))
+
+    # 処理時間メトリクステーブル
+    processing_data = [
+        ["Processing Metric", "Value"],
+        ["Avg Processing Time", f"{results.avg_processing_time:.3f} seconds"],
+        ["Min Processing Time", f"{results.min_processing_time:.3f} seconds"],
+        ["Max Processing Time", f"{results.max_processing_time:.3f} seconds"],
+        ["Std Dev Processing", f"{results.std_processing_time:.3f} seconds"],
+        ["Median Processing Time", f"{results.median_processing_time:.3f} seconds"],
+    ]
+    print("\n" + tabulate(processing_data, headers="firstrow", tablefmt="grid"))
+
+    # ストリーミング品質メトリクス
+    quality_data = [
+        ["Streaming Quality", "Value"],
+        ["Buffer Underruns", results.buffer_underruns],
+        ["Buffer Overruns", results.buffer_overruns],
+        ["Avg Buffer Size", f"{results.avg_buffer_size:.1f}"],
+        ["Max Buffer Size", results.max_buffer_size],
+        ["Throughput Stability (CV)", f"{results.throughput_stability:.3f}"],
+        ["Cumulative Drift", f"{results.cumulative_drift:.3f} seconds"],
+        ["Max Drift", f"{results.max_drift:.3f} seconds"],
+    ]
+    print("\n" + tabulate(quality_data, headers="firstrow", tablefmt="grid"))
 
     # メモリメトリクス
     memory_data = [
         ["Memory Metric", "Value"],
         ["Model Memory Usage", f"{results.model_memory_gb:.2f} GB"],
         ["Avg Inference Memory", f"{results.avg_inference_memory_mb:.1f} MB"],
+        ["Peak Memory Usage", f"{results.peak_memory_mb:.1f} MB"],
     ]
     print("\n" + tabulate(memory_data, headers="firstrow", tablefmt="grid"))
 
-    # チャンク別詳細
-    print("\n=== Per-Chunk Details ===")
-    chunk_data = [["Chunk", "Duration (s)", "Processing (s)", "RTF", "Cumulative RTF"]]
-    for m in results.chunk_metrics:
-        chunk_data.append(
-            [
-                f"{m.chunk_index + 1}",
-                f"{m.audio_duration:.2f}",
-                f"{m.processing_time:.3f}",
-                f"{m.rtf:.3f}",
-                f"{m.cumulative_rtf:.3f}",
-            ]
-        )
-    print(tabulate(chunk_data, headers="firstrow", tablefmt="grid"))
+    # RTFサマリー
+    rtf_data = [
+        ["RTF Metric", "Value"],
+        ["Overall RTF", f"{results.overall_rtf:.3f}"],
+        ["Avg Chunk RTF", f"{results.avg_chunk_rtf:.3f}"],
+        ["Min Chunk RTF", f"{results.min_chunk_rtf:.3f}"],
+        ["Max Chunk RTF", f"{results.max_chunk_rtf:.3f}"],
+        ["RTF Consistency (StdDev)", f"{results.rtf_consistency:.3f}"],
+    ]
+    print("\n" + tabulate(rtf_data, headers="firstrow", tablefmt="grid"))
 
-    print(f"\nFull Transcription: {results.full_transcription}")
+    # チャンク別詳細（最初の10チャンクのみ表示）
+    if results.chunk_metrics:
+        print("\n=== Per-Chunk Details (first 10 chunks) ===")
+        chunk_data = [
+            ["Chunk", "Audio Duration", "Processing", "RTF", "Latency", "Buffer"]
+        ]
+        for m in results.chunk_metrics[:10]:
+            chunk_data.append(
+                [
+                    f"{m.chunk_index}",
+                    f"{m.audio_duration:.2f}s",
+                    f"{m.processing_duration:.3f}s",
+                    f"{m.rtf:.3f}",
+                    f"{m.latency:.3f}s",
+                    m.buffer_size_at_arrival,
+                ]
+            )
+        print(tabulate(chunk_data, headers="firstrow", tablefmt="grid"))
+
+        if len(results.chunk_metrics) > 10:
+            print(f"... and {len(results.chunk_metrics) - 10} more chunks")
+
+    print(
+        f"\nFull Transcription: {results.full_transcription[:200]}..."
+        if len(results.full_transcription) > 200
+        else f"\nFull Transcription: {results.full_transcription}"
+    )
 
 
 def save_streaming_yaml_results(
-    results: StreamingBenchmarkResults,
+    results: StreamingMetrics,
     system_info: dict,
     model_path: str,
     chunk_size: float,
@@ -157,25 +199,24 @@ def save_streaming_yaml_results(
     else:
         features_yaml = " []"
 
-    # チャンクメトリクスをYAML用にフォーマット
+    # チャンクメトリクスをYAML用にフォーマット（最初の20個のみ）
     chunks_yaml = ""
-    for m in results.chunk_metrics:
+    for m in results.chunk_metrics[:20]:
         chunks_yaml += f"""
   - chunk_index: {m.chunk_index}
     start_time: {m.start_time:.2f}
     end_time: {m.end_time:.2f}
     audio_duration: {m.audio_duration:.2f}
-    processing_time: {m.processing_time:.3f}
+    processing_duration: {m.processing_duration:.3f}
     rtf: {m.rtf:.3f}
-    cumulative_rtf: {m.cumulative_rtf:.3f}"""
+    latency: {m.latency:.3f}
+    buffer_size: {m.buffer_size_at_arrival}"""
 
-    # チャンク間レイテンシをフォーマット
-    if results.inter_chunk_latencies:
-        latencies_yaml = "\n" + "\n".join(
-            f"  - {lat:.3f}" for lat in results.inter_chunk_latencies
-        )
-    else:
-        latencies_yaml = " []"
+    if len(results.chunk_metrics) > 20:
+        chunks_yaml += f"\n  # ... and {len(results.chunk_metrics) - 20} more chunks"
+
+    # サマリー情報を作成
+    summary = results.get_summary()
 
     # YAMLコンテンツを作成
     yaml_content = f"""# Whisper OpenVINO Streaming Benchmark Results
@@ -205,24 +246,56 @@ configuration:
 
 # Overall Performance Metrics
 performance:
-  total_audio_duration: {results.total_audio_duration:.2f}
-  total_processing_time: {results.total_processing_time:.3f}
-  overall_rtf: {results.overall_rtf:.3f}
-  throughput_audio_per_sec: {results.throughput_audio_per_sec:.2f}
-  model_memory_gb: {results.model_memory_gb:.2f}
-  avg_inference_memory_mb: {results.avg_inference_memory_mb:.1f}
+  total_audio_duration: {summary["overview"]["total_audio_duration"]:.2f}
+  total_processing_time: {summary["overview"]["total_processing_time"]:.3f}
+  overall_rtf: {summary["overview"]["overall_rtf"]:.3f}
+  throughput_audio_per_sec: {summary["overview"]["throughput_audio_per_sec"]:.2f}
+  total_chunks: {summary["overview"]["total_chunks"]}
+  is_realtime_capable: {results.is_realtime_capable()}
 
 # Latency Metrics
 latency:
-  first_chunk_latency: {results.first_chunk_latency:.3f}
-  avg_chunk_processing_time: {results.avg_chunk_processing_time:.3f}
-  min_chunk_processing_time: {results.min_chunk_processing_time:.3f}
-  max_chunk_processing_time: {results.max_chunk_processing_time:.3f}
-  std_chunk_processing_time: {results.std_chunk_processing_time:.3f}
-  avg_inter_chunk_latency: {results.avg_inter_chunk_latency:.3f}
+  first_chunk_latency: {summary["latency"]["first_chunk_latency"]:.3f}
+  first_token_latency: {summary["latency"]["first_token_latency"]:.3f}
+  avg_latency: {summary["latency"]["avg_latency"]:.3f}
+  min_latency: {summary["latency"]["min_latency"]:.3f}
+  max_latency: {summary["latency"]["max_latency"]:.3f}
 
-# Inter-chunk Latencies
-inter_chunk_latencies:{latencies_yaml}
+# Processing Time Metrics
+processing:
+  avg_processing_time: {summary["processing"]["avg_processing_time"]:.3f}
+  std_processing_time: {summary["processing"]["std_processing_time"]:.3f}
+  min_processing_time: {summary["processing"]["min_processing_time"]:.3f}
+  max_processing_time: {summary["processing"]["max_processing_time"]:.3f}
+  median_processing_time: {summary["processing"]["median_processing_time"]:.3f}
+
+# RTF Metrics
+rtf_metrics:
+  overall_rtf: {summary["rtf"]["overall_rtf"]:.3f}
+  avg_chunk_rtf: {summary["rtf"]["avg_chunk_rtf"]:.3f}
+  min_chunk_rtf: {summary["rtf"]["min_chunk_rtf"]:.3f}
+  max_chunk_rtf: {summary["rtf"]["max_chunk_rtf"]:.3f}
+  rtf_consistency: {summary["rtf"]["rtf_consistency"]:.3f}
+
+# Streaming Quality
+streaming_quality:
+  buffer_underruns: {summary["streaming_quality"]["buffer_underruns"]}
+  buffer_overruns: {summary["streaming_quality"]["buffer_overruns"]}
+  avg_buffer_size: {summary["streaming_quality"]["avg_buffer_size"]:.1f}
+  max_buffer_size: {summary["streaming_quality"]["max_buffer_size"]}
+  throughput_stability: {summary["streaming_quality"]["throughput_stability"]:.3f}
+
+# Drift Metrics
+drift:
+  cumulative_drift: {summary["drift"]["cumulative_drift"]:.3f}
+  max_drift: {summary["drift"]["max_drift"]:.3f}
+  drift_recovery_points: {summary["drift"]["drift_recovery_points"]}
+
+# Memory Usage
+memory:
+  model_memory_gb: {summary["memory"]["model_memory_gb"]:.2f}
+  avg_inference_memory_mb: {summary["memory"]["avg_inference_memory_mb"]:.1f}
+  peak_memory_mb: {summary["memory"]["peak_memory_mb"]:.1f}
 
 # Per-Chunk Metrics
 chunk_metrics:{chunks_yaml}
